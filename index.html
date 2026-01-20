@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幻影粒子 | 交互式3D视觉系统</title>
+    <!-- 引入 Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #00f2ff;
+            --bg-dark: #050505;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            overflow: hidden;
+            color: #fff;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* 隐藏的视频元素，仅用于手势检测 */
+        #video-input {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 240px;
+            height: 180px;
+            border-radius: 12px;
+            border: 2px solid var(--primary-color);
+            background: #000;
+            z-index: 10;
+            transform: scaleX(-1);
+            /* 镜像显示 */
+            object-fit: cover;
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+
+        #video-input:hover {
+            opacity: 1;
+        }
+
+        /* 现代 UI 控制面板 */
+        .ui-panel {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            width: 300px;
+            padding: 24px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #fff, var(--primary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 600;
+        }
+
+        .control-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .btn-model {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-model:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-model.active {
+            background: var(--primary-color);
+            color: #000;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .color-picker-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #color-input {
+            -webkit-appearance: none;
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            background: none;
+        }
+
+        #color-input::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        #color-input::-webkit-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+
+        .fullscreen-btn {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .fullscreen-btn:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 状态指示器 */
+        .status-badge {
+            position: absolute;
+            bottom: -30px;
+            left: 0;
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% {
+                box-shadow: 0 0 0 0px rgba(0, 242, 255, 0.7);
+            }
+
+            100% {
+                box-shadow: 0 0 0 10px rgba(0, 242, 255, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="ui-panel">
+        <h1>幻影粒子系统</h1>
+
+        <div class="control-group">
+            <label>粒子形态</label>
+            <div class="model-grid">
+                <button class="btn-model active" data-model="heart">爱心</button>
+                <button class="btn-model" data-model="flower">花朵</button>
+                <button class="btn-model" data-model="saturn">土星</button>
+                <button class="btn-model" data-model="fireworks">烟花</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>粒子基色</label>
+            <div class="color-picker-container">
+                <input type="color" id="color-input" value="#00f2ff">
+                <span id="color-value">#00f2FF</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>交互说明</label>
+            <p style="font-size: 0.8rem; color: rgba(255,255,255,0.4); line-height: 1.5;">
+                在摄像头前展示手掌。<br>
+                <b>张开掌心</b>：粒子群扩散与增强<br>
+                <b>握紧拳头</b>：粒子群收缩与汇聚
+            </p>
+        </div>
+
+        <div class="status-badge" id="gesture-status">
+            <div class="pulse"></div>
+            <span>等待摄像头权限...</span>
+        </div>
+    </div>
+
+    <button class="fullscreen-btn" id="fullscreen-toggle" title="全屏模式">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3">
+            </path>
+        </svg>
+    </button>
+
+    <video id="video-input" autoplay playsinline></video>
+
+    <!-- 依赖库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
